@@ -1,8 +1,7 @@
 vcap单节点部署方案
 ======
 
-注意，现在本人正在做一些实验，这个仓库会存在很大的不稳定，安装脚本请使用
-https://github.com/ChenMingHe/vcap.back/blob/master/dev_setup/bin/vcap_dev_setup
+注意，现在本人正在做一些实验，这个仓库会存在很大的不稳定，安装脚本请使用https://github.com/ChenMingHe/vcap.back/blob/master/dev_setup/bin/vcap_dev_setup
 =====
 
 Cloud Foundry源码，因为官方已经开始放弃Chef的安装部署方式，但是BOSH一直觉得太难，尤其对于没有IaaS平台的大家而言，BOSH简直就是一个噩梦，
