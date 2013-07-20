@@ -98,7 +98,7 @@ if [ -z "$CLOUDFOUNDRY_DOMAIN" ]; then
 fi
 
 if [ -z "$VCAP_REPO_BASE" ]; then
-  # TODO:将仓库地址修改为为对仓库
+  # 将仓库地址修改为为对仓库
   echo "set repo to https://github.com/cloudfoundry"
   VCAP_REPO_BASE=https://github.com/ChenMingHe
 fi
@@ -111,14 +111,13 @@ fi
 #run_cmd apt-get update
 
 # 安装相关依赖包
-echo "install basic depency"
 readonly PREREQUISITES=(git ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential ssl-cert libncurses5 libncurses5-dev unixodbc unixodbc-dev libalien-wxwidgets-perl  freeglut3-dev libwxgtk2.8-dev xsltproc fop gcc-4.4 libssl0.9.8 rubygems)
-echo "Installing prerequisites..."
+echo "安装预依赖包"
 run_cmd apt-get $APT_CONFIG install -qym "${PREREQUISITES[@]}"
 
 if [ ! -f ${GEM} ] || [ `${GEM} -v` \< "1.3.6" ]; then
   # Blobstore_client requires gem >= 1.3.6
-  echo "Installing rubygems..."
+  echo "安装rubygems..."
   CWD=`pwd`
   cd /tmp
   wget -q http://production.cf.rubygems.org/rubygems/rubygems-1.3.6.tgz
@@ -132,17 +131,17 @@ echo "更换GEM源"
 GEM_SOURCE='http://ruby.taobao.org/'
 if [[ "$(gem sources | tail -1)" != $GEM_SOURCE ]]; then 
         echo "changge gem source to http://ruby.taobao.org/"
-        gem sources --remove http://rubygems.org/;
-        gem sources --add http://ruby.taobao.org/;
-        gem sources --update;
+        ${GEM} sources --remove http://rubygems.org/;
+        ${GEM} sources --add http://ruby.taobao.org/;
+        ${GEM} sources --update;
 fi
 
 # we need to install net-ssh ans net-ssh-gatewayto avoid dependency problems on chef.
-echo "Installing net-ssh..."
+echo "安装net-ssh..."
 NET_SSH_VERSION="2.2.2"
 ${GEM} list -i net-ssh -v ${NET_SSH_VERSION} || sudo ${GEM} install net-ssh --version ${NET_SSH_VERSION} -q --no-ri --no-rdoc > /dev/null
 
-echo "Installing net-ssh-gateway..."
+echo "安装net-ssh-gateway..."
 NET_SSH_GATEWAY_VERSION=" 1.0.0"
 ${GEM} list -i net-ssh-gateway -v ${NET_SSH_GATEWAY_VERSION} || sudo ${GEM} install net-ssh-gateway --version ${NET_SSH_GATEWAY_VERSION} -q --no-ri --no-rdoc > /dev/null
 
@@ -159,15 +158,13 @@ ${GEM} list -i blobstore_client -v ${BLOB_VERSION} || sudo ${GEM} install blobst
 echo "Installing rake..."
 ${GEM} list -i rake -i || sudo ${GEM} install rake -q --no-ri --no-rdoc > /dev/null
 
-# Clone cloudfoundry repo
-# echo "Installing git..."
-# run_cmd apt-get $APT_CONFIG install -qym git-core
-
+echo "获取vcap仓库"
 [ -d $CLOUDFOUNDRY_HOME ] || mkdir $CLOUDFOUNDRY_HOME
 REPO=vcap
 if [ ! -d $CLOUDFOUNDRY_HOME/${REPO} ]; then
   if ! (cd $CLOUDFOUNDRY_HOME
-    git clone --no-checkout $VCAP_REPO_BASE/$REPO
+    #TODO: 更换仓库地址
+    git clone --no-checkout $VCAP_REPO_BASE/minivcap vcap
     cd $REPO
     git checkout $VCAP_REPO_BRANCH
     git submodule update --recursive --init
@@ -200,10 +197,9 @@ else
 fi
 
 #TODO： 获取Maven仓库
-# wget ...  /tmp从网站获取源码包
-# mkdir ~/.m2/
-# tar xzvf /tmp ... -C ~/.m2
-
+[[ -d ~/.m2]] || mkdir ~/.m2
+[[ -d ~/.m2/repository ]] || mkdir ~/.m2/repository
+git clone $VCAP_REPO_BASE/cfrepo.git ~/.m2/repository
 
 # Launch chef
 ARGS=""
