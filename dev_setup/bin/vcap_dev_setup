@@ -18,6 +18,7 @@ OPTIONS:
   -r           cloud foundry repo base
   -b           cloud foundry repo branch/tag/SHA
   -m           指定获取安装依赖包存放目录，参考： https://github.com/ChenMingHe/package
+  -n           指定获取maven依赖库存放目录
 EOF
 }
 
@@ -82,10 +83,14 @@ do
       PROXY=$OPTARG
       export http_proxy=$PROXY
       export https_proxy=$PROXY
+      ;;
     m)
       DEPEND_PACK_DIR=$OPTARG
       echo "依赖包目录${DEPEND_PACK_DIR}"
       ;;
+    n)
+      MAVEN_PACK_DIR=$OPTARG
+      echo "maven包目录$(MAVEN_PACK_DIR)"
   esac
 done
 
@@ -130,10 +135,10 @@ fi
 echo "更换GEM源"
 GEM_SOURCE='http://ruby.taobao.org/'
 if [[ "$(gem sources | tail -1)" != $GEM_SOURCE ]]; then 
-        echo "changge gem source to http://ruby.taobao.org/"
-        ${GEM} sources --remove http://rubygems.org/;
-        ${GEM} sources --add http://ruby.taobao.org/;
-        ${GEM} sources --update;
+  echo "changge gem source to http://ruby.taobao.org/"
+  ${GEM} sources --remove http://rubygems.org/;
+  ${GEM} sources --add http://ruby.taobao.org/;
+  ${GEM} sources --update;
 fi
 
 # we need to install net-ssh ans net-ssh-gatewayto avoid dependency problems on chef.
@@ -163,8 +168,7 @@ echo "获取vcap仓库"
 REPO=vcap
 if [ ! -d $CLOUDFOUNDRY_HOME/${REPO} ]; then
   if ! (cd $CLOUDFOUNDRY_HOME
-    #TODO: 更换仓库地址
-    git clone --no-checkout $VCAP_REPO_BASE/minivcap vcap
+    git clone --no-checkout $VCAP_REPO_BASE/$REPO
     cd $REPO
     git checkout $VCAP_REPO_BRANCH
     git submodule update --recursive --init
@@ -177,29 +181,36 @@ else
 fi
 
 #TODO: 获取router等组件对源码
-if [[ -d $CLOUDFOUNDRY_HOME/${REPO} ]] then
+if [[ -d $CLOUDFOUNDRY_HOME/${REPO} ]]; then
   echo "获取相关组件源码"
   cd $CLOUDFOUNDRY_HOME/${REPO}
-  for i in dea router acm cloud_controller services stager uaa do 
+  for i in dea router acm cloud_controller services stager uaa; do 
     git clone --no-checkout $VCAP_REPO_BASE/${i}.git
+    git checkout $VCAP_REPO_BRANCH
   done
   cd -
 fi
 
 #TODO: 获取相关依赖包
 [[ -d /var/cache/dev_setup ]] || sudo mkdir /var/cache/dev_setup
-if [[ -d $DEPEND_PACK_DIR ]] then
+echo "如果你已经备份过/var/cache/dev_setup目录下的包，使用-m指定对应目录"
+if [[ -d $DEPEND_PACK_DIR ]]; then
   echo "从指定目录${DEPEND_PACK_DIR}拷贝依赖项到安装目录/var/cache/dev_setup"
-  sudo cp $DEPEND_PACK_DIR/* /var/cache/dev_setup
+  sudo cp -r -u $DEPEND_PACK_DIR/* /var/cache/dev_setup
 else
-  echo "如果你已经备份过/var/cache/dev_setup目录下的包，使用-m指定对应目录"
-  git clone $VCAP_REPO_BASE/package.git /var/cache/dev_setup
+  sudo git clone --no-checkout $VCAP_REPO_BASE/package.git /var/cache/dev_setup
+  git checkout $VCAP_REPO_BRANCH
 fi
 
 #TODO： 获取Maven仓库
 [[ -d ~/.m2]] || mkdir ~/.m2
 [[ -d ~/.m2/repository ]] || mkdir ~/.m2/repository
-git clone $VCAP_REPO_BASE/cfrepo.git ~/.m2/repository
+if [[ -d $MAVEN_PACK_DIR ]]; then 
+  cp -r -u $MAVEN_PACK_DIR/* ~/.m2/repository  
+else
+  git clone $VCAP_REPO_BASE/cfrepo.git ~/.m2/repository
+  git checkout $VCAP_REPO_BRANCH
+fi
 
 # Launch chef
 ARGS=""
