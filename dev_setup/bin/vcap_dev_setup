@@ -1,0 +1,224 @@
+#!/bin/bash
+# Copyright (c) 2012 VMware, Inc.
+# Install vcap components on Ubuntu systems.
+
+set -o errexit
+
+usage() {
+cat <<EOF
+usage: $0 options
+
+OPTIONS:
+  -h           显示帮助
+  -a           对所有选项选择"Y"
+  -p           http proxy i.e. -p http://username:password@host:port/
+  -c           指定配置文件
+  -d           指定安装目录
+  -D           指定使用对域名 (默认: vcap.me)
+  -r           cloud foundry repo base
+  -b           cloud foundry repo branch/tag/SHA
+  -m           指定获取安装依赖包存放目录，参考： https://github.com/ChenMingHe/package
+EOF
+}
+
+function run_cmd () {
+  if [ -z "$PROXY" ]; then
+    sudo $*
+  else
+    sudo env http_proxy=$PROXY $*
+  fi
+}
+
+function clear_bundler_settings () {
+  [ $# -ge 1 ] || return 1
+  local DIR=$1
+  # Do we have a Bundler problem?
+  find $DIR -type d -name .bundle | grep -Fq .bundle || return 0
+  if [ "$ALL" != true ]; then
+    read -p "Remembered Bundler options could cause you troubles, do you want me to clear them for you? [Y/n]"
+    [[ $REPLY =~ ^[nN] ]] && return 0
+  fi
+  (cd $DIR && find -type d -name .bundle -prune -exec rm -r {} \; )
+}
+
+RUBY="/usr/bin/ruby"
+GEM="/usr/bin/gem"
+APT_CONFIG="-o Acquire::http::No-Cache=True -o Acquire::BrokenProxy=true -o Acquire::Retries=3"
+
+if [ -n "$http_proxy" ]; then
+  if [ -z "$https_proxy" ]; then
+    echo "Please set https_proxy env variable."
+    exit 1
+  fi
+  PROXY=$http_proxy
+fi
+
+while getopts "had:p:c:D:r:b:m:" OPTION
+do
+  case $OPTION in
+    h)
+      usage
+      exit 1
+      ;;
+    a)
+      ALL=true
+      ;;
+    c)
+      CONFIG_FILE=$OPTARG
+      ;;
+    d)
+      CLOUDFOUNDRY_HOME=$OPTARG
+      ;;
+    D)
+      CLOUDFOUNDRY_DOMAIN=$OPTARG
+      ;;
+    r)
+      VCAP_REPO_BASE=$OPTARG
+      ;;
+    b)
+      VCAP_REPO_BRANCH=$OPTARG
+      ;;
+    p)
+      PROXY=$OPTARG
+      export http_proxy=$PROXY
+      export https_proxy=$PROXY
+    m)
+      DEPEND_PACK_DIR=$OPTARG
+      echo "依赖包目录${DEPEND_PACK_DIR}"
+      ;;
+  esac
+done
+
+if [ -z "$CLOUDFOUNDRY_HOME" ]; then
+  CLOUDFOUNDRY_HOME=~/cloudfoundry
+fi
+
+if [ -z "$CLOUDFOUNDRY_DOMAIN" ]; then
+  CLOUDFOUNDRY_DOMAIN=vcap.me
+fi
+
+if [ -z "$VCAP_REPO_BASE" ]; then
+  # TODO:将仓库地址修改为为对仓库
+  echo "set repo to https://github.com/cloudfoundry"
+  VCAP_REPO_BASE=https://github.com/ChenMingHe
+fi
+
+if [ -z "$VCAP_REPO_BRANCH" ]; then
+  VCAP_REPO_BRANCH=master
+fi
+
+# apt-get update
+#run_cmd apt-get update
+
+# 安装相关依赖包
+echo "install basic depency"
+readonly PREREQUISITES=(git ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential ssl-cert libncurses5 libncurses5-dev unixodbc unixodbc-dev libalien-wxwidgets-perl  freeglut3-dev libwxgtk2.8-dev xsltproc fop gcc-4.4 libssl0.9.8 rubygems)
+echo "Installing prerequisites..."
+run_cmd apt-get $APT_CONFIG install -qym "${PREREQUISITES[@]}"
+
+if [ ! -f ${GEM} ] || [ `${GEM} -v` \< "1.3.6" ]; then
+  # Blobstore_client requires gem >= 1.3.6
+  echo "Installing rubygems..."
+  CWD=`pwd`
+  cd /tmp
+  wget -q http://production.cf.rubygems.org/rubygems/rubygems-1.3.6.tgz
+  tar zxf rubygems-1.3.6.tgz
+  cd rubygems-1.3.6
+  sudo ${RUBY} setup.rb --no-format-executable > /dev/null
+  cd ${CWD}
+fi
+
+echo "更换GEM源"
+GEM_SOURCE='http://ruby.taobao.org/'
+if [[ "$(gem sources | tail -1)" != $GEM_SOURCE ]]; then 
+        echo "changge gem source to http://ruby.taobao.org/"
+        gem sources --remove http://rubygems.org/;
+        gem sources --add http://ruby.taobao.org/;
+        gem sources --update;
+fi
+
+# we need to install net-ssh ans net-ssh-gatewayto avoid dependency problems on chef.
+echo "Installing net-ssh..."
+NET_SSH_VERSION="2.2.2"
+${GEM} list -i net-ssh -v ${NET_SSH_VERSION} || sudo ${GEM} install net-ssh --version ${NET_SSH_VERSION} -q --no-ri --no-rdoc > /dev/null
+
+echo "Installing net-ssh-gateway..."
+NET_SSH_GATEWAY_VERSION=" 1.0.0"
+${GEM} list -i net-ssh-gateway -v ${NET_SSH_GATEWAY_VERSION} || sudo ${GEM} install net-ssh-gateway --version ${NET_SSH_GATEWAY_VERSION} -q --no-ri --no-rdoc > /dev/null
+
+echo "Installing chef..."
+CHEF_VERSION="10.16.4"
+${GEM} list -i chef -v ${CHEF_VERSION} || sudo ${GEM} install chef --version ${CHEF_VERSION} -q --no-ri --no-rdoc > /dev/null
+
+# Install blobstore_client
+echo "Installing blobstore_client..."
+BLOB_VERSION="0.4.0"
+${GEM} list -i blobstore_client -v ${BLOB_VERSION} || sudo ${GEM} install blobstore_client --version ${BLOB_VERSION} -q --no-ri --no-rdoc > /dev/null
+
+# Install rake
+echo "Installing rake..."
+${GEM} list -i rake -i || sudo ${GEM} install rake -q --no-ri --no-rdoc > /dev/null
+
+# Clone cloudfoundry repo
+# echo "Installing git..."
+# run_cmd apt-get $APT_CONFIG install -qym git-core
+
+[ -d $CLOUDFOUNDRY_HOME ] || mkdir $CLOUDFOUNDRY_HOME
+REPO=vcap
+if [ ! -d $CLOUDFOUNDRY_HOME/${REPO} ]; then
+  if ! (cd $CLOUDFOUNDRY_HOME
+    git clone --no-checkout $VCAP_REPO_BASE/$REPO
+    cd $REPO
+    git checkout $VCAP_REPO_BRANCH
+    git submodule update --recursive --init
+  ); then
+    echo "Unable to clone cloudfoundry $REPO repo."
+    exit 1
+  fi
+else
+  clear_bundler_settings $CLOUDFOUNDRY_HOME/$REPO
+fi
+
+#TODO: 获取router等组件对源码
+if [[ -d $CLOUDFOUNDRY_HOME/${REPO} ]] then
+  echo "获取相关组件源码"
+  cd $CLOUDFOUNDRY_HOME/${REPO}
+  for i in dea router acm cloud_controller services stager uaa do 
+    git clone --no-checkout $VCAP_REPO_BASE/${i}.git
+  done
+  cd -
+fi
+
+#TODO: 获取相关依赖包
+[[ -d /var/cache/dev_setup ]] || sudo mkdir /var/cache/dev_setup
+if [[ -d $DEPEND_PACK_DIR ]] then
+  echo "从指定目录${DEPEND_PACK_DIR}拷贝依赖项到安装目录/var/cache/dev_setup"
+  sudo cp $DEPEND_PACK_DIR/* /var/cache/dev_setup
+else
+  echo "如果你已经备份过/var/cache/dev_setup目录下的包，使用-m指定对应目录"
+  git clone $VCAP_REPO_BASE/package.git /var/cache/dev_setup
+fi
+
+#TODO： 获取Maven仓库
+# wget ...  /tmp从网站获取源码包
+# mkdir ~/.m2/
+# tar xzvf /tmp ... -C ~/.m2
+
+
+# Launch chef
+ARGS=""
+if [ -n "$CLOUDFOUNDRY_HOME" ]; then
+  ARGS="-d $CLOUDFOUNDRY_HOME"
+fi
+
+if [ -n "$CLOUDFOUNDRY_DOMAIN" ]; then
+  ARGS="$ARGS -D $CLOUDFOUNDRY_DOMAIN"
+fi
+
+if [ -n "$CONFIG_FILE" ]; then
+  ARGS="$ARGS -c $CONFIG_FILE"
+fi
+
+echo "Launching chef..."
+sleep 3
+$CLOUDFOUNDRY_HOME/vcap/dev_setup/lib/chefsolo_launch.rb $ARGS
