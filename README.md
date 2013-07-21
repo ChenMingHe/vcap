@@ -3,14 +3,18 @@ vcap单节点部署方案
 
 2013.07.20 更新：
 ----
-+ 修改vcap_dev_setup 脚本，实现自动化部署，在Ubuntu 12.04 系统上实验成果
-+ 从CF官方剥离了vcap，并将官方的源码更新记录删除，vcap源码就2.8M，但是git仓库有450M
-+ 添加了health_manager 1.0版本，官方已经更新到2.0版本，结果出现一些问题，所以暂时使用1.0版本
-+ 添加了services，官方已经废除services仓库，所以使用官方默认的部署文档是不能成功的
+
+    + 修改vcap_dev_setup 脚本，实现自动化部署，在Ubuntu 12.04 系统上实验成果
+    + 从CF官方剥离了vcap，并将官方的源码更新记录删除，vcap源码就2.8M，但是git仓库有450M
+    + 添加了health_manager 1.0版本，官方已经更新到2.0版本，结果出现一些问题，所以暂时使用1.0版本
+    + 添加了services，官方已经废除services仓库，所以使用官方默认的部署文档是不能成功的
 
 下一步工作：
-+ 让Chef支持CF 2.0的部署工作
-+ 实现简单的配置修改工具，实现节点的自动化管理
+
+    + 让Chef支持CF 2.0的部署工作
+    + 实现简单的配置修改工具，实现节点的自动化管理
+
+
 
 
 2013.07.20 更新：
@@ -18,18 +22,24 @@ vcap单节点部署方案
 Cloud Foundry源码，因为官方已经开始放弃Chef的安装部署方式，但是BOSH一直觉得太难，尤其对于没有IaaS平台的大家而言，BOSH简直就是一个噩梦，
 所以将所有官方的源码同步下来，便于自己开发。
 
-首先，Chef有一个安装脚本，可以参考网址：https://github.com/ChenMingHe/vcap/blob/master/dev_setup/bin/vcap_dev_setup
-建议将这个脚本复制下来用，执行命令
+*下面的内容我已经更新到新的安装脚本中了，并不需要按照下面的脚本执行*
 
-$ gedit ~/setup
+首先，Chef有一个安装脚本，可以参考网址：
+    
+   https://github.com/ChenMingHe/vcap/blob/master/dev_setup/bin/vcap_dev_setup
+
+建议获取这个脚本，执行命令
+
+    $ wget https://raw.github.com/ChenMingHe/vcap/master/dev_setup/bin/vcap_dev_setup
+    $ mv vcap_dev_setup ~/setup
 
 然后将网页中的内容复制、黏贴、并保存，然后修改权限，让其可以运行
 
-$ sudo chmod +x ~/setup
+    $ sudo chmod +x ~/setup
 
 在运行安装脚本前，需要先解决一些依赖项，这样安装过程基本上就非常快了，否则就会有各种诡异问题，首先需要解决依赖的库问题，执行命令
 
-$ sudo apt-get install libncurses5 libncurses5-dev unixodbc unixodbc-dev libalien-wxwidgets-perl  freeglut3-dev libwxgtk2.8-dev xsltproc fop gcc-4.4 libssl0.9.8 ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential ssl-cert rubygems
+    $ sudo apt-get install libncurses5 libncurses5-dev unixodbc unixodbc-dev libalien-wxwidgets-perl  freeglut3-dev libwxgtk2.8-dev xsltproc fop gcc-4.4 libssl0.9.8 ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential ssl-cert rubygems
 
 +++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -39,7 +49,7 @@ $ sudo apt-get install libncurses5 libncurses5-dev unixodbc unixodbc-dev libalie
 
 如果本地已经有这些安装包，则将这些包直接拷贝到本地的： /var/cache/dev_setup  目录下即可。如果没有，也可以通过命令获取：
 
-$ git clone https://github.com/ChenMingHe/package.git 
+    $ git clone https://github.com/ChenMingHe/package.git 
 
 获取以后，根据https://github.com/ChenMingHe/package 中给的建议，将这些包放在相应的目录下即可。
 
@@ -47,9 +57,8 @@ $ git clone https://github.com/ChenMingHe/package.git
 所以我也将这部分的库全部弄出来了，对应网址就是https://github.com/ChenMingHe/cfrepo 获取相应的包的时候，在目录 ： ~/.m2/repository
  中执行命令：
 
-$ cd  ~/.m2/repository
-
-$ git clone https://github.com/ChenMingHe/cfrepo
+    $ cd  ~/.m2/repository
+    $ git clone https://github.com/ChenMingHe/cfrepo
 
 通过这种方式，在编译过程中就少了大量下载Maven代码的过程。
 
@@ -57,45 +66,36 @@ $ git clone https://github.com/ChenMingHe/cfrepo
 还是将这些源码准备下来了。如果本地有这些源码，在部署其他主机的时候，不妨就从中去获取，速度肯定比网上要快很多很多。
 尤其是service的源码，现在Cloud Foundry的源码已经放在一个很深的目录中了，不太好找到。
 
-vcap : https://github.com/ChenMingHe/vcap
-
-cloud_controller : https://github.com/ChenMingHe/cloud_controller
-
-uaa : https://github.com/ChenMingHe/uaa
-
-stager : https://github.com/ChenMingHe/stager
-
-dea : https://github.com/ChenMingHe/dea
-
-router : https://github.com/ChenMingHe/router
-
-acm : https://github.com/ChenMingHe/acm
-
-services : https://github.com/ChenMingHe/services
+    vcap : https://github.com/ChenMingHe/vcap
+    cloud_controller : https://github.com/ChenMingHe/cloud_controller
+    uaa : https://github.com/ChenMingHe/uaa
+    stager : https://github.com/ChenMingHe/stager
+    dea : https://github.com/ChenMingHe/dea
+    router : https://github.com/ChenMingHe/router
+    acm : https://github.com/ChenMingHe/acm
+    services : https://github.com/ChenMingHe/services
 
 (注：其实我也不知道这个源码能否继续用下去，因为我总觉得一些重要的组件的源码我还没完全弄下来，如果有缺失，很可能某天就
 不能再用了)
 
 这些源码的话应该是这样的一个目录结构：
 
-~/
- + vcap 
-  + cloud_controller
-  + uaa
-  + stager 
-  + dea
-  + router
-  + acm
-  + services
+    ~/
+     + vcap 
+     + cloud_controller
+     + uaa
+     + stager 
+     + dea
+     + router
+     + acm
+     + services
 
 第四步、更换一个好一点的gem源，因为国外的Gem源速度不行，下载起来会相当的慢，所以最好更换成国内的源。
 建议使用国内的淘宝源，执行命令：
 
-$ gem sources --remove http://rubygems.org/
-
-$ gem sources --add http://ruby.taobao.org/
-
-$ gem sources --update
+    $ gem sources --remove http://rubygems.org/
+    $ gem sources --add http://ruby.taobao.org/
+    $ gem sources --update
 
 好了，如果能够做好这些步骤，那应该比官方的方式要快很多。
 
@@ -105,14 +105,13 @@ $ gem sources --update
 只需要修改配置文件，将不需要的组件关闭即可。
 执行命令：
 
-$ ~/setup
+    $ ~/setup
 
 如果顺利的话，应该可以一次成功，中间可能会出现网络不行，结果安装过程报错的问题，如果是的话就重新执行安装脚本。
 如果不是，可以上网查资料，我以前也做了一些笔记，大家可以参考：
 
-http://blog.csdn.net/wearenoth/article/details/8035968
-
-http://blog.csdn.net/wearenoth/article/details/8072799
+    http://blog.csdn.net/wearenoth/article/details/8035968
+    http://blog.csdn.net/wearenoth/article/details/8072799
 
 
 我只能说，这东西部署起来，真心考研耐心，里面的问题一般都很诡异。如果需要查阅资料。最好上Google Group或者Github的Issue列表
