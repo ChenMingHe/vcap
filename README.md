@@ -1,9 +1,18 @@
 vcap单节点部署方案
 ======
 
-注意，现在本人正在做一些实验，这个仓库会存在很大的不稳定，安装脚本请使用https://github.com/ChenMingHe/vcap.back/blob/master/dev_setup/bin/vcap_dev_setup
-=====
+2013.07.20 更新：
++ 修改vcap_dev_setup 脚本，实现自动化部署，在Ubuntu 12.04 系统上实验成果
++ 从CF官方剥离了vcap，并将官方的源码更新记录删除，vcap源码就2.8M，但是git仓库有450M
++ 添加了health_manager 1.0版本，官方已经更新到2.0版本，结果出现一些问题，所以暂时使用1.0版本
++ 添加了services，官方已经废除services仓库，所以使用官方默认的部署文档是不能成功的
 
+下一步工作：
++ 让Chef支持CF 2.0的部署工作
++ 实现简单的配置修改工具，实现节点的自动化管理
+
+
+2013.07.20 更新：
 Cloud Foundry源码，因为官方已经开始放弃Chef的安装部署方式，但是BOSH一直觉得太难，尤其对于没有IaaS平台的大家而言，BOSH简直就是一个噩梦，
 所以将所有官方的源码同步下来，便于自己开发。
 
