@@ -103,8 +103,8 @@ if [ -z "$CLOUDFOUNDRY_DOMAIN" ]; then
 fi
 
 if [ -z "$VCAP_REPO_BASE" ]; then
-  # 将仓库地址修改为为对仓库
-  echo "set repo to https://github.com/cloudfoundry"
+  # 将仓库地址修改为为对仓库，当然如果觉得不好，可以将这个网址改成https://github.com/cloudfoundry
+  echo "指向源码仓库到：https://github.com/ChenMingHe"
   VCAP_REPO_BASE=https://github.com/ChenMingHe
 fi
 
@@ -112,12 +112,31 @@ if [ -z "$VCAP_REPO_BRANCH" ]; then
   VCAP_REPO_BRANCH=master
 fi
 
+
+echo "CF官方已经不支持Chef的部署，现在这个脚本只能用于实现CF 1.0的部署"
+echo "我在ubuntu 12.04上测试的时候这份安装脚本已经可以正常部署CF节点"
+echo "如果在部署过程中出现中断，一般是因为网络原因造成的，毕竟没办法做到"
+echo "完全的本地化，这时候只要重新运行这个脚本就可以了"
+echo "在事先准备好依赖包和maven仓库的情况下，一个节点部署的时间在1个小时左右"
+
+echo ""
+echo "有两点需要补充，我遇到过当系统Gem版本为2.0.5的时候，这个脚本就不能用了"
+echo "我成功的时候，系统使用的gem版本为1.8.14"
+echo "如果已经成功部署了节点，然后因为IP地址的改变导致这个节点不能用，一种方法"
+echo "修改~/.deployment/devbox/config/目录下每个组件的配置文件；另一种比较偷懒"
+echo "的方法就是重新执行这个脚本，但是重新安装完成后记得重启系统，因为这时候"
+echo "nats-server并没有重启，这样就不会出现问题了"
+echo "最后，祝君好运!!!~~~~~"
+echo "                                                  -- 陈源 电子科技大学"
+
 # apt-get update
-#run_cmd apt-get update
+echo ""
+echo "下面的这个语句可以注释掉，这样就不会每次都更新源了"
+run_cmd apt-get update
 
 # 安装相关依赖包
-readonly PREREQUISITES=(git ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential ssl-cert libncurses5 libncurses5-dev unixodbc unixodbc-dev libalien-wxwidgets-perl  freeglut3-dev libwxgtk2.8-dev xsltproc fop gcc-4.4 libssl0.9.8 rubygems)
 echo "安装预依赖包"
+readonly PREREQUISITES=(git ruby ruby-dev libopenssl-ruby rdoc ri irb build-essential ssl-cert libncurses5 libncurses5-dev unixodbc unixodbc-dev libalien-wxwidgets-perl  freeglut3-dev libwxgtk2.8-dev xsltproc fop gcc-4.4 libssl0.9.8 rubygems)
 run_cmd apt-get $APT_CONFIG install -qym "${PREREQUISITES[@]}"
 
 if [ ! -f ${GEM} ] || [ `${GEM} -v` \< "1.3.6" ]; then
@@ -132,7 +151,7 @@ if [ ! -f ${GEM} ] || [ `${GEM} -v` \< "1.3.6" ]; then
   cd ${CWD}
 fi
 
-echo "更换GEM源"
+echo "更换GEM源，使用国外的GEM源速度比较慢，国内的淘宝源速度快很多"
 GEM_SOURCE='http://ruby.taobao.org/'
 if [[ "$(gem sources | tail -1)" != $GEM_SOURCE ]]; then 
   echo "changge gem source to http://ruby.taobao.org/"
@@ -150,17 +169,17 @@ echo "安装net-ssh-gateway..."
 NET_SSH_GATEWAY_VERSION=" 1.0.0"
 ${GEM} list -i net-ssh-gateway -v ${NET_SSH_GATEWAY_VERSION} || sudo ${GEM} install net-ssh-gateway --version ${NET_SSH_GATEWAY_VERSION} -q --no-ri --no-rdoc > /dev/null
 
-echo "Installing chef..."
+echo "安装chef..."
 CHEF_VERSION="10.16.4"
 ${GEM} list -i chef -v ${CHEF_VERSION} || sudo ${GEM} install chef --version ${CHEF_VERSION} -q --no-ri --no-rdoc > /dev/null
 
 # Install blobstore_client
-echo "Installing blobstore_client..."
+echo "安装blobstore_client..."
 BLOB_VERSION="0.4.0"
 ${GEM} list -i blobstore_client -v ${BLOB_VERSION} || sudo ${GEM} install blobstore_client --version ${BLOB_VERSION} -q --no-ri --no-rdoc > /dev/null
 
 # Install rake
-echo "Installing rake..."
+echo "安装rake..."
 ${GEM} list -i rake -i || sudo ${GEM} install rake -q --no-ri --no-rdoc > /dev/null
 
 echo "获取vcap仓库"
@@ -171,7 +190,6 @@ if [ ! -d $CLOUDFOUNDRY_HOME/${REPO} ]; then
     git clone --no-checkout $VCAP_REPO_BASE/$REPO
     cd $REPO
     git checkout $VCAP_REPO_BRANCH
-    git submodule update --recursive --init
   ); then
     echo "Unable to clone cloudfoundry $REPO repo."
     exit 1
@@ -185,6 +203,7 @@ if [[ -d $CLOUDFOUNDRY_HOME/${REPO} ]]; then
   echo "获取相关组件源码"
   cd $CLOUDFOUNDRY_HOME/${REPO}
   for i in dea router acm cloud_controller services stager uaa; do 
+    echo "从${VCAP_REPO_BASE}，获取${i}的源码"
     if ! (git clone $VCAP_REPO_BASE/${i}.git
       git checkout $VCAP_REPO_BRANCH
     ); then 
@@ -195,9 +214,23 @@ if [[ -d $CLOUDFOUNDRY_HOME/${REPO} ]]; then
   cd -
 fi
 
+# 因为官网已经将health_manager升级到2.0了，这里使用的是1.0的health_manager
+echo "官网已经将health_manager升级到2.0了，这里使用的是1.0的health_manager"
+cd $CLOUDFOUNDRY_HOME/${REPO}/cloud_controller
+if ! (git clone $VCAP_REPO_BASE/health_manager.git
+    ); then 
+   echo "Unable to clone cloudfoundry health_manager repo"
+fi
+cd -
+
+##############################################################
+echo "接下来会从https://github.com/ChenMingHe获取相关的依赖包"
+echo "如果你身边有装好的CF节点，请将/vcap/cache/dev_setup下的"
+echo "安装包拷贝到本地对应目录下，或者使用参数 -m 指定这些包的"
+echo "所在目录，这样可以加速你的安装速度，当然也可以将下面的这"
+echo "部分代码注释掉，让安装脚本自动从对应网站获取安装包"
 #TODO: 获取相关依赖包
 [[ -d /var/cache/dev_setup ]] || sudo mkdir /var/cache/dev_setup
-echo "如果你已经备份过/var/cache/dev_setup目录下的包，使用-m指定对应目录"
 if [[ -d $DEPEND_PACK_DIR ]]; then
   echo "从指定目录${DEPEND_PACK_DIR}拷贝依赖项到安装目录/var/cache/dev_setup"
   sudo cp -r -u $DEPEND_PACK_DIR/* /var/cache/dev_setup
@@ -209,6 +242,11 @@ else
   fi 
 fi
 
+echo "接下来会从https://github.com/ChenMingHe获取maven的依赖包"
+echo "如果你身边有装好的CF节点，请将~/.m2/repository/下的所有目"
+echo "录拷贝到本地对应目录下，或者使用参数 -n 指定这些内容的"
+echo "所在目录，这样可以加速你的安装速度，当然也可以将下面的这"
+echo "部分代码注释掉，让安装脚本自动从maven中央仓库网站获取安装包"
 #TODO： 获取Maven仓库
 [[ -d ~/.m2 ]] || mkdir ~/.m2
 [[ -d ~/.m2/repository ]] || mkdir ~/.m2/repository
@@ -222,6 +260,7 @@ else
     echo "Unable to clone maven depency"
   fi
 fi
+###############################################################
 
 # Launch chef
 ARGS=""
@@ -240,6 +279,6 @@ if [ -n "$CONFIG_FILE" ]; then
   ARGS="$ARGS -c $CONFIG_FILE"
 fi
 
-echo "Launching chef..."
+echo "加载chef..."
 sleep 3
 $CLOUDFOUNDRY_HOME/vcap/dev_setup/lib/chefsolo_launch.rb $ARGS
