@@ -54,7 +54,7 @@ if [ -n "$http_proxy" ]; then
   PROXY=$http_proxy
 fi
 
-while getopts "had:p:c:D:r:b:m:" OPTION
+while getopts "had:p:c:D:r:b:m:n:" OPTION
 do
   case $OPTION in
     h)
@@ -185,8 +185,12 @@ if [[ -d $CLOUDFOUNDRY_HOME/${REPO} ]]; then
   echo "获取相关组件源码"
   cd $CLOUDFOUNDRY_HOME/${REPO}
   for i in dea router acm cloud_controller services stager uaa; do 
-    git clone --no-checkout $VCAP_REPO_BASE/${i}.git
-    git checkout $VCAP_REPO_BRANCH
+    if ! (git clone $VCAP_REPO_BASE/${i}.git
+      git checkout $VCAP_REPO_BRANCH
+    ); then 
+       echo "Unable to clone cloudfoundry $i repo"
+       exit 1
+    fi
   done
   cd -
 fi
@@ -198,18 +202,25 @@ if [[ -d $DEPEND_PACK_DIR ]]; then
   echo "从指定目录${DEPEND_PACK_DIR}拷贝依赖项到安装目录/var/cache/dev_setup"
   sudo cp -r -u $DEPEND_PACK_DIR/* /var/cache/dev_setup
 else
-  sudo git clone --no-checkout $VCAP_REPO_BASE/package.git /var/cache/dev_setup
-  git checkout $VCAP_REPO_BRANCH
+  if ! ( sudo git clone $VCAP_REPO_BASE/package.git /var/cache/dev_setup
+    git checkout $VCAP_REPO_BRANCH
+  ); then 
+     echo "Unable to clone cloudfoundry decency"
+  fi 
 fi
 
 #TODO： 获取Maven仓库
-[[ -d ~/.m2]] || mkdir ~/.m2
+[[ -d ~/.m2 ]] || mkdir ~/.m2
 [[ -d ~/.m2/repository ]] || mkdir ~/.m2/repository
+echo "$MAVEN_PACK_DIR"
 if [[ -d $MAVEN_PACK_DIR ]]; then 
   cp -r -u $MAVEN_PACK_DIR/* ~/.m2/repository  
 else
-  git clone $VCAP_REPO_BASE/cfrepo.git ~/.m2/repository
+  if ! (git clone $VCAP_REPO_BASE/cfrepo.git ~/.m2/repository
   git checkout $VCAP_REPO_BRANCH
+  ); then 
+    echo "Unable to clone maven depency"
+  fi
 fi
 
 # Launch chef
@@ -221,6 +232,9 @@ fi
 if [ -n "$CLOUDFOUNDRY_DOMAIN" ]; then
   ARGS="$ARGS -D $CLOUDFOUNDRY_DOMAIN"
 fi
+
+echo "更换gcc版本为gcc-4.4"
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-4.4 50
 
 if [ -n "$CONFIG_FILE" ]; then
   ARGS="$ARGS -c $CONFIG_FILE"

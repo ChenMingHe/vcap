@@ -1,0 +1,21 @@
+[submodule "acm"]
+	path = acm
+	url = https://github.com:ChenMingHe/acm.git
+[submodule "cloud_controller"]
+	path = cloud_controller
+	url = https://github.com:ChenMingHe/cloud_controller
+[submodule "router"]
+	path = router
+	url = https://github.com:ChenMingHe/router
+[submodule "services"]
+	path = services
+	url = https://github.com:ChenMingHe/services
+[submodule "stager"]
+	path = stager
+	url = https://github.com:ChenMingHe/stager
+[submodule "uaa"]
+	path = uaa
+	url = https://github.com:ChenMingHe/uaa
+[submodule "dea"]
+	path = dea
+	url = https://github.com:ChenMingHe/dea
